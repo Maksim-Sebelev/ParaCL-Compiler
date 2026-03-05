@@ -421,7 +421,8 @@ void visit(Condition const& node, llvmIrTranslatorData& data)
     {
         data.builder.SetInsertPoint(if_blocks[it]);
 
-        auto&& cond_val = generate_expression(node.get_ifs()[it], data);
+        auto&& if_it = static_cast<If>(node.get_ifs()[it]);
+        auto&& cond_val = generate_expression(if_it.condition(), data);
         auto&& cond_i1 = data.builder.CreateICmpNE(cond_val, 
             llvm::ConstantInt::get(data.builder.getInt32Ty(), 0), "if_cond");
 
