@@ -386,7 +386,7 @@ bool visit(If const& node, llvmIrTranslatorData& data)
     
     data.builder.SetInsertPoint(end_block);
     
-    return true;  // для совместимости с интерфейсом
+    return true;
 }
 
 //-----------------------------------------------------------------------------
