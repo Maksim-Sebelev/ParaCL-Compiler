@@ -200,6 +200,14 @@ llvm::Value* visit(BinaryOperator const& node, llvmIrTranslatorData& data)
 {
     LOGINFO("paracl: ir translator: binary operation");
 
+    if (node.type() == BinaryOperator::ASGN)
+    {
+        auto&& variable = static_cast<Variable const &>(node.larg());
+        auto&& right = generate_expression(node.rarg(), data);
+        data.nametable.set_value(variable.name(), right);
+        return right;
+    }
+
     auto&& left = generate_expression(node.larg(), data);
     auto&& right = generate_expression(node.rarg(), data);
 
@@ -215,52 +223,53 @@ llvm::Value* visit(BinaryOperator const& node, llvmIrTranslatorData& data)
         case BinaryOperator::ISAB:
         {
             auto&& cmp = data.builder.CreateICmpSGT(left, right);
-            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp");
+            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp_ab");
         }
         case BinaryOperator::ISABE:
         {
             auto&& cmp = data.builder.CreateICmpSGE(left, right);
-            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp");
+            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp_abe");
         }
         case BinaryOperator::ISLS:
         {
             auto&& cmp = data.builder.CreateICmpSLT(left, right);
-            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp");
+            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp_ls");
         }
         case BinaryOperator::ISLSE:
         {
             auto&& cmp = data.builder.CreateICmpSLE(left, right);
-            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp");
+            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp_lse");
         }
         case BinaryOperator::ISEQ:
         {
             auto&& cmp = data.builder.CreateICmpEQ(left, right);
-            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp");
+            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp_eq");
         }
         case BinaryOperator::ISNE:
         {
             auto&& cmp = data.builder.CreateICmpNE(left, right);
-            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp");
+            return data.builder.CreateZExt(cmp, data.builder.getInt32Ty(), "__cmp_ne");
         }
         default: break;
     }
 
-    auto&& variable_name = static_cast<Variable>(node.larg()).name();
+    auto&& variable = static_cast<Variable const &>(node.larg());
+    auto&& name = variable.name();
+    auto&& value = data.nametable.get_variable_value(name);
 
     switch(node.type())
     {
         case BinaryOperator::ASGN:    break;
-        case BinaryOperator::ADDASGN: right = data.builder.CreateAdd (data.nametable.get_variable_value(variable_name), right, "__addAsgnResult"); break;
-        case BinaryOperator::SUBASGN: right = data.builder.CreateSub (data.nametable.get_variable_value(variable_name), right, "__subAsgnResult"); break;
-        case BinaryOperator::MULASGN: right = data.builder.CreateMul (data.nametable.get_variable_value(variable_name), right, "__mulAsgnResult"); break;
-        case BinaryOperator::DIVASGN: right = data.builder.CreateSDiv(data.nametable.get_variable_value(variable_name), right, "__divAsgnResult"); break;
-        case BinaryOperator::REMASGN: right = data.builder.CreateSRem(data.nametable.get_variable_value(variable_name), right, "__remAsgnResult"); break;
+        case BinaryOperator::ADDASGN: right = data.builder.CreateAdd (value, right, "__addAsgnResult"); break;
+        case BinaryOperator::SUBASGN: right = data.builder.CreateSub (value, right, "__subAsgnResult"); break;
+        case BinaryOperator::MULASGN: right = data.builder.CreateMul (value, right, "__mulAsgnResult"); break;
+        case BinaryOperator::DIVASGN: right = data.builder.CreateSDiv(value, right, "__divAsgnResult"); break;
+        case BinaryOperator::REMASGN: right = data.builder.CreateSRem(value, right, "__remAsgnResult"); break;
         default:
             throw std::runtime_error("Assignment operators should be handled by statement nodes");
     }
 
-    data.nametable.set_value(variable_name, right);
-
+    data.nametable.set_value(name, right);
     return right;
 }
 
@@ -469,18 +478,18 @@ void visit(Scope const& node, llvmIrTranslatorData& data)
 } /* namespace last::node */
 //-----------------------------------------------------------------------------
 
-SPECIALIZE_CREATE(last::node::Print,           last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::Scan,            last::node::generatable_expression, last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::Variable,        last::node::generatable_expression, last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::NumberLiteral,   last::node::generatable_expression, last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::StringLiteral,   last::node::generatable_expression)
-SPECIALIZE_CREATE(last::node::UnaryOperator,   last::node::generatable_expression, last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::BinaryOperator,  last::node::generatable_expression, last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::While,           last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::If,              last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::Else,            last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::Condition,       last::node::generatable_statement)
-SPECIALIZE_CREATE(last::node::Scope,           last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::Print         , last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::Scan          , last::node::generatable_expression, last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::Variable      , last::node::generatable_expression, last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::NumberLiteral , last::node::generatable_expression, last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::StringLiteral , last::node::generatable_expression)
+SPECIALIZE_CREATE(last::node::UnaryOperator , last::node::generatable_expression, last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::BinaryOperator, last::node::generatable_expression, last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::While         , last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::If            , last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::Else          , last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::Condition     , last::node::generatable_statement)
+SPECIALIZE_CREATE(last::node::Scope         , last::node::generatable_statement)
 
 //---------------------------------------------------------------------------------------------------------------
 
